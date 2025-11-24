@@ -1,0 +1,29 @@
+name: Build AlphaPulse EXE
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: 安裝 Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 安裝必要的工具
+      run: |
+        pip install flet yfinance mplfinance pandas matplotlib pyinstaller
+
+    - name: 開始打包成 EXE
+      run: |
+        flet pack alphapulse_ultimate.py --name AlphaPulse --onefile --noconsole
+
+    - name: 上傳成品給你看
+      uses: actions/upload-artifact@v4
+      with:
+        name: 下載我-AlphaPulse-App
+        path: dist/AlphaPulse.exe
+
