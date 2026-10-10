@@ -180,7 +180,7 @@ class StockService:
             return None
 
 # --- 3. UI 元件層 ---
-class StockCard(ft.UserControl):
+class StockCard(ft.Container):
     """自選股列表中的單張卡片"""
     def __init__(self, symbol, data, on_delete_click, on_card_click):
         super().__init__()
@@ -188,8 +188,9 @@ class StockCard(ft.UserControl):
         self.data = data
         self.on_delete_click = on_delete_click
         self.on_card_click = on_card_click
+        self.content = self.create_card()
 
-    def build(self):
+    def create_card(self):
         color = AppColors.UP if self.data['change'] > 0 else AppColors.DOWN
         icon = ft.icons.TRENDING_UP if self.data['change'] > 0 else ft.icons.TRENDING_DOWN
         
