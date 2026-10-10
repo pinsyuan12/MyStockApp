@@ -492,8 +492,8 @@ def main(page: ft.Page):
         bgcolor=AppColors.SURFACE,
         indicator_color=AppColors.PRIMARY,
         destinations=[
-            ft.NavigationDestination(icon=ft.icons.DASHBOARD_OUTLINED, selected_icon=ft.icons.DASHBOARD, label="監控"),
-            ft.NavigationDestination(icon=ft.icons.ANALYTICS_OUTLINED, selected_icon=ft.icons.ANALYTICS, label="分析"),
+            ft.NavigationBarDestination(icon=ft.icons.DASHBOARD_OUTLINED, selected_icon=ft.icons.DASHBOARD, label="監控"),
+            ft.NavigationBarDestination(icon=ft.icons.ANALYTICS_OUTLINED, selected_icon=ft.icons.ANALYTICS, label="分析"),
         ],
         on_change=on_nav_change
     )
