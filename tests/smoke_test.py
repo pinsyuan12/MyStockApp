@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory() as temp:
         assert db.get_watchlist() == ["2330.TW"]
         db.remove_from_watchlist("2330.TW")
         assert db.get_watchlist() == []
+        db.conn.close()
 
         class Ticker:
             fast_info = SimpleNamespace(last_price=105.0, previous_close=100.0)
@@ -46,7 +47,11 @@ with tempfile.TemporaryDirectory() as temp:
         assert quote["pct"] == 5.0
 
         page = FakePage()
-        app["main"](page)
+        class FakeDB:
+            def get_watchlist(self):
+                return []
+        with patch.dict(app["main"].__globals__, {"DatabaseManager": FakeDB}):
+            app["main"](page)
         assert page.title == "AlphaPulse Ultimate｜台股分析系統"
         assert len(page.controls) == 1
         assert len(page.navigation_bar.destinations) == 2
