@@ -56,6 +56,6 @@ with tempfile.TemporaryDirectory() as temp:
         assert len(page.controls) == 1
         assert len(page.navigation_bar.destinations) == 2
         assert page.update_count >= 1
-        print("煙霧測試通過：股票代碼、翻譯字典、資料庫、報價與頁面建立")
+        print("SMOKE TEST PASSED: symbol, translations, sqlite, quotes, page")
     finally:
         os.chdir(previous_dir)
