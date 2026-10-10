@@ -6,14 +6,41 @@ import sqlite3
 import io
 import base64
 import matplotlib
+from matplotlib import font_manager
 import threading
 import datetime
 
-# --- 0. 全局設定與常數 ---
+# --- 0. 全域設定與常數 ---
 matplotlib.use('Agg')  # 設定無頭模式，避免彈出視窗
 DB_NAME = "alphapulse_v2.db"
 
-# 色票系統 (Fintech 風格)
+# Yahoo Finance 產業分類的繁體中文名稱（未列入者保留原始名稱）。
+SECTOR_ZH_TW = {
+    "Technology": "資訊科技",
+    "Financial Services": "金融服務",
+    "Healthcare": "醫療保健",
+    "Industrials": "工業",
+    "Consumer Cyclical": "非必需消費",
+    "Consumer Defensive": "必需消費",
+    "Communication Services": "通訊服務",
+    "Basic Materials": "原物料",
+    "Energy": "能源",
+    "Real Estate": "不動產",
+    "Utilities": "公用事業",
+    "Other": "其他",
+    "N/A": "未提供",
+}
+
+# 優先選用已安裝的中文字型顯示圖表標題。
+_AVAILABLE_FONTS = {item.name for item in font_manager.fontManager.ttflist}
+for _font in ("Microsoft JhengHei", "Noto Sans CJK TC", "PingFang TC", "Microsoft YaHei"):
+    if _font in _AVAILABLE_FONTS:
+        matplotlib.rcParams["font.sans-serif"] = [_font, "DejaVu Sans"]
+        break
+matplotlib.rcParams["axes.unicode_minus"] = False
+
+
+# 色票系統（金融科技風格）
 class AppColors:
     BG = "#0f172a"          # 深藍黑背景
     SURFACE = "#1e293b"     # 卡片背景
@@ -24,7 +51,7 @@ class AppColors:
     TEXT_SUB = "#94a3b8"    # 次要文字
     DIVIDER = "#334155"
 
-# --- 1. 模型層 (Model & Database) ---
+# --- 1. 資料模型與資料庫 ---
 class DatabaseManager:
     """處理所有 SQLite 資料庫操作"""
     def __init__(self):
@@ -60,7 +87,7 @@ class DatabaseManager:
         cursor.execute("SELECT symbol FROM watchlist ORDER BY added_at DESC")
         return [row[0] for row in cursor.fetchall()]
 
-# --- 2. 服務層 (Data Service) ---
+# --- 2. 資料服務層 ---
 class StockService:
     """處理 Yahoo Finance API 所有請求"""
     
@@ -103,9 +130,9 @@ class StockService:
             info = ticker.info
             return {
                 "name": info.get("longName", symbol),
-                "sector": info.get("sector", "N/A"),
-                "pe": info.get("trailingPE", "N/A"),
-                "eps": info.get("trailingEps", "N/A"),
+                "sector": SECTOR_ZH_TW.get(info.get("sector"), info.get("sector") or "未提供"),
+                "pe": info.get("trailingPE", "未提供"),
+                "eps": info.get("trailingEps", "未提供"),
                 "mkt_cap": info.get("marketCap", 0),
                 "volume": info.get("volume", 0),
                 "high": info.get("dayHigh", 0),
@@ -141,7 +168,7 @@ class StockService:
                 style=s, 
                 mav=(5, 20, 60), 
                 volume=True,
-                title=f'\n{symbol} Daily Chart',
+                title=f'\n{symbol} 日K線圖',
                 savefig=dict(fname=buf, dpi=100, bbox_inches='tight', transparent=True),
                 ylabel='',     # 省略 Y 軸標籤以節省手機空間
                 ylabel_lower=''
@@ -149,11 +176,11 @@ class StockService:
             buf.seek(0)
             return base64.b64encode(buf.read()).decode()
         except Exception as e:
-            print(f"Chart Error: {e}")
+            print(f"K 線圖產生失敗：{e}")
             return None
 
-# --- 3. UI 組件層 (Components) ---
-class StockCard(ft.UserControl):
+# --- 3. UI 元件層 ---
+class StockCard(ft.Container):
     """自選股列表中的單張卡片"""
     def __init__(self, symbol, data, on_delete_click, on_card_click):
         super().__init__()
@@ -161,8 +188,9 @@ class StockCard(ft.UserControl):
         self.data = data
         self.on_delete_click = on_delete_click
         self.on_card_click = on_card_click
+        self.content = self.create_card()
 
-    def build(self):
+    def create_card(self):
         color = AppColors.UP if self.data['change'] > 0 else AppColors.DOWN
         icon = ft.icons.TRENDING_UP if self.data['change'] > 0 else ft.icons.TRENDING_DOWN
         
@@ -174,7 +202,7 @@ class StockCard(ft.UserControl):
             content=ft.Row([
                 ft.Column([
                     ft.Text(self.symbol, size=18, weight="bold", color=AppColors.TEXT_MAIN),
-                    ft.Text(f"Prev: {self.data['prev_close']:.2f}", size=12, color=AppColors.TEXT_SUB),
+                    ft.Text(f"昨收：{self.data['prev_close']:.2f}", size=12, color=AppColors.TEXT_SUB),
                 ]),
                 ft.Row([
                     ft.Column([
@@ -190,10 +218,10 @@ class StockCard(ft.UserControl):
             ], alignment="spaceBetween")
         )
 
-# --- 4. 主程式邏輯 (Main Controller) ---
+# --- 4. 主程式控制層 ---
 def main(page: ft.Page):
     # --- 頁面初始化 ---
-    page.title = "AlphaPulse Ultimate"
+    page.title = "AlphaPulse Ultimate｜台股分析系統"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = AppColors.BG
     page.padding = 0
@@ -243,14 +271,14 @@ def main(page: ft.Page):
     view_watchlist = ft.Column([
         ft.Container(
             padding=ft.padding.only(left=20, top=50, bottom=10),
-            content=ft.Text("My Watchlist", size=32, weight="900", color=AppColors.TEXT_MAIN)
+            content=ft.Text("我的自選股", size=32, weight="900", color=AppColors.TEXT_MAIN)
         ),
         lv_watchlist
     ], expand=True)
 
     # 2. 個股分析視圖
     txt_search = ft.TextField(
-        hint_text="輸入代碼 (例如 2330)", 
+        hint_text="輸入股票代碼（例如：2330）", 
         border_radius=12,
         bgcolor=AppColors.SURFACE,
         color=AppColors.TEXT_MAIN,
@@ -284,7 +312,7 @@ def main(page: ft.Page):
         ])
     )
 
-    # 分頁內容 (Tabs)
+    # 分頁內容（頁籤）
     tabs_content = ft.Tabs(
         selected_index=0,
         animation_duration=300,
@@ -361,7 +389,7 @@ def main(page: ft.Page):
         btn_fav.disabled = True
         page.update()
 
-        # 1. 獲取報價 (Quote)
+        # 1. 取得報價
         quote = StockService.get_quote(symbol)
         if not quote:
             lbl_detail_price.value = "查無資料"
@@ -381,7 +409,7 @@ def main(page: ft.Page):
         btn_fav.disabled = False
         page.update()
 
-        # 2. 平行載入重型資料 (Chart, Details, News)
+        # 2. 載入圖表、基本面與新聞資料
         # 為了保持 UI 響應，我們分步更新
         
         # A. K線圖
@@ -395,7 +423,7 @@ def main(page: ft.Page):
         info_row.controls.clear()
         if details:
             # 格式化市值 (億)
-            mkt_val = f"{details['mkt_cap']/100000000:.1f}億" if details['mkt_cap'] else "N/A"
+            mkt_val = f"{details['mkt_cap']/100000000:.1f}億" if details['mkt_cap'] else "未提供"
             info_row.controls = [
                 build_stat_box("最高", details['high']),
                 build_stat_box("最低", details['low']),
@@ -403,7 +431,7 @@ def main(page: ft.Page):
                 build_stat_box("本益比", details['pe']),
                 build_stat_box("EPS", details['eps']),
                 build_stat_box("市值", mkt_val),
-                ft.Container(width="100%", content=ft.Text(f"產業: {details['sector']}", color=AppColors.TEXT_SUB, size=12, text_align="center"))
+                ft.Container(width="100%", content=ft.Text(f"產業：{details['sector']}", color=AppColors.TEXT_SUB, size=12, text_align="center"))
             ]
 
         # C. 新聞
@@ -423,7 +451,7 @@ def main(page: ft.Page):
                                 ft.Text(n.get('publisher'), size=12, color=AppColors.PRIMARY),
                                 ft.Text(date_str, size=12, color=AppColors.TEXT_SUB)
                             ], alignment="spaceBetween"),
-                            # ft.Text("點擊閱讀全文 (需外部瀏覽器)", size=10, italic=True, color=AppColors.TEXT_SUB)
+                            # ft.Text("點擊閱讀全文（需開啟外部瀏覽器）", size=10, italic=True, color=AppColors.TEXT_SUB)
                         ]),
                         on_click=lambda e, link=n.get('link'): page.launch_url(link)
                     )
@@ -464,8 +492,8 @@ def main(page: ft.Page):
         bgcolor=AppColors.SURFACE,
         indicator_color=AppColors.PRIMARY,
         destinations=[
-            ft.NavigationDestination(icon=ft.icons.DASHBOARD_OUTLINED, selected_icon=ft.icons.DASHBOARD, label="監控"),
-            ft.NavigationDestination(icon=ft.icons.ANALYTICS_OUTLINED, selected_icon=ft.icons.ANALYTICS, label="分析"),
+            ft.NavigationBarDestination(icon=ft.icons.DASHBOARD_OUTLINED, selected_icon=ft.icons.DASHBOARD, label="監控"),
+            ft.NavigationBarDestination(icon=ft.icons.ANALYTICS_OUTLINED, selected_icon=ft.icons.ANALYTICS, label="分析"),
         ],
         on_change=on_nav_change
     )

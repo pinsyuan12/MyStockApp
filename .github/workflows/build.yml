@@ -1,4 +1,4 @@
-name: Build AlphaPulse EXE
+name: 建置 AlphaPulse 繁體中文版
 
 on: [push, workflow_dispatch]
 
@@ -15,13 +15,18 @@ jobs:
 
     - name: 安裝必要的工具
       run: |
-        pip install flet yfinance mplfinance pandas matplotlib pyinstaller
+        pip install flet==0.27.6 yfinance mplfinance pandas matplotlib pyinstaller
+
+    - name: 編譯及無網路煙霧測試
+      run: |
+        python -m py_compile "AlphaPulse Ultimate.py"
+        python tests/smoke_test.py
 
     - name: 開始打包成 EXE
       run: |
-        flet pack alphapulse_ultimate.py --name AlphaPulse --onefile --noconsole
+        flet pack "AlphaPulse Ultimate.py" --name AlphaPulse --yes
 
-    - name: 上傳成品給你看
+    - name: 上傳 Windows 執行檔
       uses: actions/upload-artifact@v4
       with:
         name: 下載我-AlphaPulse-App
